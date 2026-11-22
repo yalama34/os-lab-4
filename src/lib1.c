@@ -1,5 +1,3 @@
-#include <stdlib.h>
-
 #include "contracts.h"
 
 int PrimeCount(int A, int B) {
