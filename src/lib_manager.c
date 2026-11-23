@@ -1,3 +1,5 @@
+#include <stddef.h>
+
 #include "lib_manager.h"
 #include "os_api.h"
 
@@ -32,13 +34,13 @@ int init_library() {
     return 0;
 }
 
-int switch_library() {
-    if (close_library(descriptor) != 0){
+int switch_library(void){
+    if (close_library() != 0){
         return -1;
     }
 
     current_lib = 1 - current_lib;
-    init_library();
+    return init_library();
 }
 
 int close_library() {
