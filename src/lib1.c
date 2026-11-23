@@ -24,5 +24,6 @@ int PrimeCount(int A, int B) {
 }
 
 float Square(float A, float B) {
+    if (A < 0 || B < 0) return -1;
     return A * B;
 }
