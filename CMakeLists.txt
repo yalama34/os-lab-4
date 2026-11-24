@@ -13,15 +13,24 @@ endif()
 add_library(lib1 SHARED src/lib1.c)
 add_library(lib2 SHARED src/lib2.c)
 
-set_target_properties(lib1 lib2 PROPERTIES PREFIX "")
+set_target_properties(lib1 lib2 PROPERTIES
+    PREFIX ""
+    WINDOWS_EXPORT_ALL_SYMBOLS ON
+)
 
 add_executable(program1 src/program1.c)
 target_link_libraries(program1 PRIVATE lib1)
 
+if(WIN32)
+    set(OS_SOURCE src/platform/os_windows.c)
+else()
+    set(OS_SOURCE src/platform/os_linux.c)
+endif()
+
 add_executable(program2
     src/program2.c
     src/lib_manager.c
-    src/platform/os_linux.c
+    ${OS_SOURCE}
 )
 
 target_link_libraries(program2 PRIVATE ${CMAKE_DL_LIBS})
