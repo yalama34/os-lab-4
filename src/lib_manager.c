@@ -9,10 +9,17 @@ static int current_lib = 0;
 static int (*prime_count)(int, int) = NULL;
 static float (*square)(float, float) = NULL;
 
+#ifdef _WIN32
+static const char *paths[] = {
+    "./lib1.dll",
+    "./lib2.dll"
+};
+#else
 static const char *paths[] = {
     "./lib1.so",
     "./lib2.so"
 };
+#endif
 
 int init_library() {
     descriptor = lib_open(paths[current_lib]);
