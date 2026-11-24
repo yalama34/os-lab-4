@@ -1,0 +1,321 @@
+\documentclass[12pt,a4paper]{article}
+\usepackage{fontspec}
+\IfFontExistsTF{Times New Roman}{\setmainfont{Times New Roman}}{\IfFontExistsTF{TeX Gyre Termes}{\setmainfont{TeX Gyre Termes}}{\setmainfont{Tinos}}}
+\IfFontExistsTF{Consolas}{\setmonofont{Consolas}[Scale=0.8]}{\setmonofont{Liberation Mono}[Scale=0.73]}
+\usepackage[russian]{babel}
+\usepackage[left=30mm,right=15mm,top=20mm,bottom=20mm]{geometry}
+\usepackage{setspace}\onehalfspacing
+\usepackage{tikz}\usetikzlibrary{arrows.meta,positioning,calc}
+\usepackage{listings,xcolor,float,hyperref}
+\usepackage{enumitem}
+\usepackage{titlesec}
+\titlespacing*{\section}{0pt}{2.1ex plus 0.2ex}{1ex}
+\titlespacing*{\subsection}{0pt}{1.4ex plus 0.2ex}{0.7ex}
+\hypersetup{hidelinks,breaklinks=true,
+  pdftitle={Отчёт по лабораторной работе № 5. Динамические библиотеки},
+  pdfauthor={Прудников Я. А.}}
+\setlength{\parindent}{1.25cm}
+\emergencystretch=2em
+\definecolor{codegray}{RGB}{247,247,247}
+\lstset{language=C,basicstyle=\ttfamily\footnotesize\singlespacing,
+  backgroundcolor=\color{codegray},breaklines=true,showstringspaces=false,
+  frame=single,framesep=5pt,columns=fullflexible,keepspaces=true}
+\setlist{itemsep=2pt,topsep=4pt}
+\begin{document}
+
+\begin{titlepage}
+\begin{center}
+{\small МИНИСТЕРСТВО НАУКИ И ВЫСШЕГО ОБРАЗОВАНИЯ\\РОССИЙСКОЙ ФЕДЕРАЦИИ}\\[4mm]
+{\small Федеральное государственное автономное образовательное учреждение\\ высшего образования\\ «Московский авиационный институт (национальный исследовательский университет)»}
+\vfill
+{\bfseries\large ОТЧЁТ ПО ЛАБОРАТОРНОЙ РАБОТЕ № 5}\\[9mm]
+Дисциплина:\\[2mm]
+{\bfseries Операционные системы и архитектура компьютера}\\[6mm]
+Тема:\\[2mm]
+{\bfseries Динамические библиотеки}\\[3mm]
+Контракты № 3 и № 7
+\vfill
+\end{center}
+\begin{flushright}\begin{minipage}{0.45\textwidth}
+Выполнил:\\ студент группы М80-203БВ-25\\ Прудников Я. А.\par\vspace{7mm}
+Преподаватель:\\ Миронов Е. С.
+\end{minipage}\end{flushright}
+\vfill\begin{center}Москва, 2026 г.\end{center}
+\end{titlepage}
+
+\section{Цель работы}
+Приобрести практические навыки создания динамических библиотек и использования их функций двумя способами: посредством линковки с библиотекой при сборке программы и посредством явной загрузки библиотеки во время исполнения средствами операционной системы. Освоить организацию кроссплатформенного интерфейса загрузки библиотек для Linux и Windows.
+
+\section{Постановка задачи}
+Разработать две динамические библиотеки с одинаковыми контрактами функций и разными алгоритмами их реализации. Подготовить две тестовые программы: первая должна использовать одну из библиотек при линковке, вторая~- загружать библиотеки по относительным путям и переключаться между ними во время работы.
+
+Для выбранных контрактов заданы следующие функции:
+\begin{itemize}
+  \item \texttt{int PrimeCount(int A, int B)}~- количество простых чисел на отрезке $[A,B]$, где $A$ и $B$~- натуральные числа. Первая реализация использует перебор делителей, вторая~- решето Эратосфена.
+  \item \texttt{float Square(float A, float B)}~- площадь фигуры по двум сторонам. Первая реализация вычисляет площадь прямоугольника $S=AB$, вторая~- площадь прямоугольного треугольника $S=AB/2$.
+\end{itemize}
+
+Пользователь вводит команды \texttt{1 A B} и \texttt{2 A B} для вызова соответствующих функций. В программе № 2 команда \texttt{0} переключает активную библиотеку. В программе № 1 переключение не предусмотрено. Сборка и использование библиотек должны быть предусмотрены для Linux и Windows.
+
+\section{Архитектура решения}
+В проекте выделены два файла с реализациями контрактов~- \texttt{lib1.c} и \texttt{lib2.c}. При сборке они преобразуются в динамические библиотеки: \texttt{lib1.so} и \texttt{lib2.so} в Linux либо \texttt{lib1.dll} и \texttt{lib2.dll} в Windows. Объявления математических функций находятся в \texttt{contracts.h}.
+
+Программа \texttt{program1} связывается с первой библиотекой при линковке и вызывает \texttt{PrimeCount()} и \texttt{Square()} непосредственно. Программа \texttt{program2} обращается к модулю \texttt{lib\_manager.c}, который хранит дескриптор активной библиотеки, её номер и указатели на функции.
+
+Для кроссплатформенности операции загрузки, получения адреса и освобождения библиотеки вынесены в общий интерфейс \texttt{os\_api.h}. В Linux его реализует файл \texttt{platform/os\_linux.c}, а в Windows~- \texttt{platform/os\_windows.c}. При сборке выбирается только один из этих файлов. Алгоритмы вычислений и обработка команд остаются общими для обеих ОС.
+
+\subsection{Схема взаимодействия компонентов}
+\begin{figure}[H]
+\centering
+\begin{tikzpicture}[
+  >=Stealth,
+  every node/.style={font=\small},
+  box/.style={draw,rounded corners,align=center,minimum width=34mm,minimum height=10mm,fill=black!3},
+  node distance=8mm and 8mm
+]
+\node[box] (p1) {\texttt{program1}\\прямой вызов};
+\node[box,right=39mm of p1] (p2) {\texttt{program2}\\обработка команд};
+\node[box,below=8mm of p2] (manager) {\texttt{lib\_manager}\\дескриптор и указатели};
+\node[box,below=8mm of manager] (api) {\texttt{os\_api.h}\\единый интерфейс};
+\node[box,below left=9mm and -10mm of api] (linux) {\texttt{os\_linux.c}\\POSIX};
+\node[box,below right=9mm and -10mm of api] (win) {\texttt{os\_windows.c}\\WinAPI};
+\node[box,below=17mm of linux,xshift=-17mm] (lib1) {\texttt{lib1.so / lib1.dll}\\перебор / прямоугольник};
+\node[box,right=11mm of lib1] (lib2) {\texttt{lib2.so / lib2.dll}\\решето / треугольник};
+\draw[->] (p2) -- (manager);
+\draw[->] (manager) -- (api);
+\draw[->] (api) -- (linux);
+\draw[->] (api) -- (win);
+\coordinate (join) at ($(linux.south)!0.5!(win.south)+(0,-5mm)$);
+\draw[dashed] (linux.south) |- (join);
+\draw[dashed] (win.south) |- (join);
+\draw[->,dashed] (join) -| (lib1.north);
+\draw[->,dashed] (join) -| (lib2.north);
+\draw[->] (p1.south) -- ++(0,-8mm) -| ([xshift=-15mm]lib1.north) node[pos=.20, left]{линковка};
+\end{tikzpicture}
+\caption{Общая архитектура для Linux и Windows}
+\end{figure}
+
+\subsection{Файловая структура проекта}
+\begin{itemize}
+  \item \texttt{src/lib1.c}, \texttt{src/lib2.c}~- две реализации контрактов;
+  \item \texttt{src/include/contracts.h}~- общие объявления функций;
+  \item \texttt{src/program1.c}~- программа с линковкой библиотеки при сборке;
+  \item \texttt{src/program2.c}~- программа с явной загрузкой библиотеки;
+  \item \texttt{src/lib\_manager.c}, \texttt{src/include/lib\_manager.h}~- управление текущей библиотекой;
+  \item \texttt{src/include/os\_api.h}~- общий интерфейс загрузки;
+  \item \texttt{src/platform/os\_linux.c} и \texttt{src/platform/os\_windows.c}~- платформозависимые реализации;
+  \item \texttt{CMakeLists.txt}~- описание сборки библиотек и программ.
+\end{itemize}
+
+\section{Реализация}
+\subsection{Функции библиотек}
+В первой реализации \texttt{PrimeCount()} перебирает числа на заданном отрезке и проверяет, существуют ли у каждого числа делители, отличные от единицы и самого числа. Если такие делители отсутствуют, число учитывается в результате. Вторая реализация строит решето Эратосфена: числа до верхней границы помечаются как потенциально простые, после чего вычёркиваются кратные найденных простых чисел. Подсчёт результата выполняется только на отрезке $[A,B]$.
+
+Для функции \texttt{Square()} используются две формулы. В первой библиотеке вычисляется $S=AB$, а во второй~- $S=AB/2$. Совпадение сигнатур позволяет менять реализацию без изменения вызывающего кода.
+
+\subsection{Использование библиотеки при линковке}
+Файл \texttt{program1.c} подключает \texttt{contracts.h}. При вводе команды \texttt{1} вызывается \texttt{PrimeCount()}, при вводе \texttt{2}~- \texttt{Square()}. Цель \texttt{lib1} указывается в \texttt{target\_link\_libraries()} при сборке исполняемого файла. Программа не осуществляет поиск символов самостоятельно.
+
+\subsection{Динамическая загрузка и переключение}
+Программа \texttt{program2} использует собственный интерфейс из трёх операций: \texttt{lib\_open()}, \texttt{get\_address()} и \texttt{lib\_close()}. В Linux они реализуются через \texttt{dlopen()}, \texttt{dlsym()} и \texttt{dlclose()} соответственно. Для получения адресов используются имена экспортируемых символов \texttt{PrimeCount} и \texttt{Square}.
+
+Изначально выбирается первая библиотека. После успешной загрузки её дескриптор и адреса функций сохраняются в статических переменных модуля \texttt{lib\_manager.c}. При вводе команды \texttt{0} текущая библиотека освобождается, её номер меняется и выполняется загрузка другой библиотеки с обновлением адресов функций. Поэтому одинаковый вызов \texttt{call\_square()} выполняет разные реализации до и после переключения.
+
+При завершении работы программа освобождает дескриптор библиотеки. Предусмотрена проверка результатов загрузки и получения адресов функций; при ошибке инициализации или переключения работа прекращается. После закрытия библиотеки указатели на функции обнуляются.
+
+\subsection{Кроссплатформенность}
+В Linux используются функции POSIX из \texttt{dlfcn.h}, в Windows~- функции WinAPI из \texttt{windows.h}. Обе реализации предоставляют одинаковый интерфейс для менеджера библиотек. Соответствие операций представлено в таблице.
+
+\begin{table}[H]
+\centering\small
+\begin{tabular}{|p{48mm}|p{42mm}|p{50mm}|}
+\hline
+Операция & Linux & Windows \\
+\hline
+Загрузка библиотеки & \texttt{dlopen()} & \texttt{LoadLibraryA()} \\
+Получение адреса & \texttt{dlsym()} & \texttt{GetProcAddress()} \\
+Освобождение & \texttt{dlclose()} & \texttt{FreeLibrary()} \\
+Диагностика ошибок & \texttt{dlerror()} & \texttt{GetLastError()} \\
+Формат файла & \texttt{.so} & \texttt{.dll} \\
+\hline
+\end{tabular}
+\caption{Сопоставление интерфейсов загрузки библиотек}
+\end{table}
+
+В Linux \texttt{dlopen()} с флагом \texttt{RTLD\_NOW} возвращает дескриптор типа \texttt{void *}. В Windows \texttt{LoadLibraryA()} возвращает дескриптор \texttt{HMODULE}. При ошибке загрузки обе функции возвращают \texttt{NULL}. Функция \texttt{GetProcAddress()} возвращает указатель типа \texttt{FARPROC}, тогда как \texttt{dlsym()} возвращает \texttt{void *}. Преобразования адресов в типы указателей на функции выполняются с учётом соглашений целевых платформ.
+
+Функция \texttt{FreeLibrary()} возвращает ненулевое значение при успехе, а \texttt{dlclose()}~- ноль. В общем интерфейсе результат закрытия нормализован: ноль при успехе и $-1$ при ошибке. Относительные пути выбираются макросом \texttt{\_WIN32}.
+
+CMake выбирает платформозависимый файл по условию \texttt{WIN32}. Библиотеки создаются как \texttt{SHARED}; для Windows с MS-совместимыми инструментами сборки включён автоматический экспорт символов. Это позволяет обращаться к функциям из DLL как при линковке, так и по имени во время исполнения. Для Linux сохраняется подключение \texttt{CMAKE\_DL\_LIBS}, необходимое там, где загрузчик требует отдельной библиотеки. Для сборки в Windows и WSL используются разные каталоги, поскольку кэш CMake зависит от среды сборки.
+
+\section{Ключевые фрагменты кода}
+Приведены основные фрагменты интерфейсов и логики работы с динамическими библиотеками.
+
+\subsection{Контракты функций}
+\begin{lstlisting}
+int PrimeCount(int A, int B);
+float Square(float A, float B);
+\end{lstlisting}
+\begin{center}\small Листинг 1 - Контракты из \texttt{contracts.h}\end{center}
+
+\subsection{Хранение состояния менеджера}
+\begin{lstlisting}
+static void *descriptor = NULL;
+static int current_lib = 0;
+
+static int (*prime_count)(int, int) = NULL;
+static float (*square)(float, float) = NULL;
+
+#ifdef _WIN32
+static const char *paths[] = {
+    "./lib1.dll", "./lib2.dll"
+};
+#else
+static const char *paths[] = {
+    "./lib1.so", "./lib2.so"
+};
+#endif
+\end{lstlisting}
+\begin{center}\small Листинг 2 - Состояние модуля \texttt{lib\_manager.c}\end{center}
+
+\subsection{Получение адресов функций}
+\begin{lstlisting}
+descriptor = lib_open(paths[current_lib]);
+if (descriptor == NULL) {
+    return -1;
+}
+
+prime_count = (int (*)(int, int))
+    get_address(descriptor, "PrimeCount");
+square = (float (*)(float, float))
+    get_address(descriptor, "Square");
+\end{lstlisting}
+\begin{center}\small Листинг 3 - Фрагмент инициализации библиотеки\end{center}
+
+\subsection{Вызов функций в двух программах}
+\begin{lstlisting}
+/* program1.c */
+int result_p = PrimeCount(arg1_p, arg2_p);
+float result_s = Square(arg1_s, arg2_s);
+
+/* program2.c */
+int result_p = call_prime_count(arg1_p, arg2_p);
+float result_s = call_square(arg1_s, arg2_s);
+\end{lstlisting}
+\begin{center}\small Листинг 4 - Различие в способах вызова функций\end{center}
+
+\subsection{Интерфейс загрузки и реализация для Windows}
+Общий интерфейс скрывает платформенные типы и способы вызова системных функций.
+\begin{lstlisting}
+void *lib_open(const char *filename);
+void *get_address(void *descriptor, const char *query);
+int lib_close(void *descriptor);
+\end{lstlisting}
+\begin{center}\small Листинг 5 - Интерфейс \texttt{os\_api.h}\end{center}
+
+\begin{lstlisting}
+#include "os_api.h"
+#include <windows.h>
+void *lib_open(const char *filename){
+    return LoadLibraryA(filename);
+}
+void *get_address(void *descriptor, const char *query){
+    return (void *)GetProcAddress((HMODULE)descriptor, query);
+}
+int lib_close(void *descriptor){
+    if (FreeLibrary((HMODULE)descriptor) == 0){
+        return -1;
+    }
+    return 0;
+}
+\end{lstlisting}
+\begin{center}\small Листинг 6 - Реализация интерфейса для Windows\end{center}
+
+\subsection{Выбор платформы при сборке}
+\begin{lstlisting}[language={}]
+add_library(lib1 SHARED src/lib1.c)
+add_library(lib2 SHARED src/lib2.c)
+
+set_target_properties(lib1 lib2 PROPERTIES
+    PREFIX ""
+    WINDOWS_EXPORT_ALL_SYMBOLS ON
+)
+
+add_executable(program1 src/program1.c)
+target_link_libraries(program1 PRIVATE lib1)
+
+if(WIN32)
+    set(OS_SOURCE src/platform/os_windows.c)
+else()
+    set(OS_SOURCE src/platform/os_linux.c)
+endif()
+
+add_executable(program2
+    src/program2.c
+    src/lib_manager.c
+    ${OS_SOURCE}
+)
+target_link_libraries(program2 PRIVATE ${CMAKE_DL_LIBS})
+add_dependencies(program2 lib1 lib2)
+\end{lstlisting}
+\begin{center}\small Листинг 7 - Основная часть \texttt{CMakeLists.txt}\end{center}
+
+\section{Тестирование}
+Функциональная проверка выполнена в Linux (WSL) и Windows. На обеих платформах проведённые тесты завершились успешно. Ниже приведены результаты консольных запусков обеих программ в Linux.
+
+\subsection{Программа № 2: динамическая загрузка}
+\begin{lstlisting}[language={},numbers=none]
+1 2 4
+2
+2 2 4
+8.000000
+0
+Library switched
+2 2 4
+4.000000
+0
+Library switched
+\end{lstlisting}
+\begin{center}\small Листинг 8 - Консольный ввод и вывод \texttt{program2}\end{center}
+
+Команда \texttt{1 2 4} вернула значение 2: на отрезке $[2,4]$ простыми являются числа 2 и 3. Для команды \texttt{2 2 4} первая библиотека вычислила площадь прямоугольника $2\cdot4=8$. После ввода \texttt{0} была выбрана вторая библиотека и та же команда вернула площадь прямоугольного треугольника $2\cdot4/2=4$. Повторная команда \texttt{0} переключила реализацию обратно.
+
+\subsection{Программа № 1: подключение при линковке}
+\begin{lstlisting}[language={},numbers=none]
+1 1 100
+25
+2 4 6
+24.000000
+0
+Unknown command
+\end{lstlisting}
+\begin{center}\small Листинг 9 - Консольный ввод и вывод \texttt{program1}\end{center}
+
+На отрезке $[1,100]$ получено 25 простых чисел. Площадь прямоугольника со сторонами 4 и 6 равна 24. Ввод команды \texttt{0} вызвал сообщение \texttt{Unknown command}, поскольку программа № 1 не предусматривает переключение библиотек.
+
+Приведённые примеры подтверждают корректность показанных вычислений и переключения реализации функции \texttt{Square()}. Измерение производительности алгоритмов и расширенное тестирование обработки ошибочного ввода в эти результаты не входят.
+
+\subsection{Сборка и проверка в Windows}
+Для сборки под Windows с генератором Visual Studio применяется следующая последовательность команд PowerShell:
+\begin{lstlisting}[language={}]
+cmake -S . -B build-win
+cmake --build build-win --config Debug
+cd build-win\Debug
+.\program1.exe
+.\program2.exe
+\end{lstlisting}
+\begin{center}\small Листинг 10 - Команды сборки и запуска в Windows\end{center}
+
+При использовании генератора с одной конфигурацией файлы могут находиться непосредственно в каталоге \texttt{build-win}. Запуск второй программы выполняется из каталога с DLL, поскольку в менеджере используются относительные пути.
+
+Работоспособность обеих программ в Windows проверена. Все проведённые тесты пройдены успешно. Таким образом, функциональная проверка подтвердила работоспособность реализации на обеих операционных системах.
+
+\section{Выводы}
+В ходе лабораторной работы изучено создание динамических библиотек с общим интерфейсом и различными реализациями функций. Для контрактов \texttt{PrimeCount()} и \texttt{Square()} реализованы алгоритмы подсчёта простых чисел и вычисления площади двух фигур. Подготовлены две программы: одна использует библиотеку, подключённую при линковке, другая загружает библиотеки во время исполнения и переключает их по команде пользователя.
+
+Сравнение двух подходов показало, что линковка с динамической библиотекой при сборке делает код программы проще: функции вызываются непосредственно, а загрузкой зависимости занимается система. Явная загрузка через \texttt{dlopen()} и \texttt{dlsym()} в Linux либо \texttt{LoadLibraryA()} и \texttt{GetProcAddress()} в Windows требует дополнительного кода для управления дескрипторами, указателями на функции и ошибками, но позволяет менять реализацию без перезапуска программы и её повторной линковки. В обоих случаях используются именно динамические библиотеки; различается способ получения доступа к их функциям.
+
+Кроссплатформенность обеспечивается разделением общего кода и платформозависимых операций. Благодаря интерфейсу \texttt{os\_api.h} менеджер библиотек не зависит от конкретных функций ОС, а CMake выбирает нужную реализацию при сборке. Различия между платформами сводятся к механизму загрузки, типам дескрипторов, обработке результатов системных функций и формату библиотек.
+
+Консольные тесты в Linux продемонстрировали работу обеих программ и переключение формулы площади в программе № 2. Тестирование в Windows также завершилось успешно. Результаты подтверждают работоспособность кроссплатформенной реализации на обеих операционных системах.
+\end{document}
